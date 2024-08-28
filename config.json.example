@@ -1,0 +1,9 @@
+{
+    "token": "CLOUDFLARE-ACCESS-TOKEN-WITH-DNS-PERMISSION",
+    "zones": [
+        {
+            "id": "domain zone id",
+            "domains": ["sub.example.com", "example.com"]
+        }
+    ]    
+}
