@@ -1,4 +1,5 @@
 mod cloudflare;
+
 use cloudflare::{CloudflareClient,DnsRecord};
 use serde::Deserialize;
 
@@ -12,7 +13,8 @@ struct Zone {
 #[derive(Deserialize)]
 struct Config {
     token: String,
-    zones: Vec<Zone>
+    zones: Vec<Zone>,
+    proxy: Option<String>
 }
 
 impl Config {
@@ -64,20 +66,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
-    let cloudflare_client = CloudflareClient::new(config.token); 
+    let cloudflare_client = CloudflareClient::new(config.token, config.proxy); 
 
     for zone in config.zones {
         let dns_records = cloudflare_client.get_dns_records(&zone.id).await?;
 
         for record in dns_records {
-            if record.r#type != "A" { continue; }; 
+            if record.kind != "A" { continue; }; 
             if !zone.domains.iter().any(|s| *s == record.name) { continue };
 
             let new_record = DnsRecord {
                 id: record.id,
                 content: ip.clone(),
                 name: record.name.clone(),
-                r#type: String::from("A")
+                kind: String::from("A")
             };
 
             cloudflare_client.update_dns_record(&zone.id, new_record).await?;

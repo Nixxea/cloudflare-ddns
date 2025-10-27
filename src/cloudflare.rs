@@ -1,3 +1,4 @@
+use reqwest::{Client, Proxy};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -11,7 +12,8 @@ pub struct DnsRecord {
     pub id: String,
     pub content: String,
     pub name: String,
-    pub r#type: String
+    #[serde(rename = "type")]
+    pub kind: String
 }
 
 pub struct CloudflareClient {
@@ -20,8 +22,13 @@ pub struct CloudflareClient {
 }
 
 impl CloudflareClient {
-    pub fn new(token: String) -> Self {
-        Self { client: reqwest::Client::new(), token }
+    pub fn new(token: String, proxy_string: Option<String>) -> Self {
+        let mut client = Client::builder();
+        if let Some(proxy_string) = proxy_string {
+            client = client.proxy(Proxy::all(proxy_string).unwrap());
+        }
+
+        Self { client: client.build().unwrap(), token }
     }
 
     pub async fn get_dns_records(&self, zone_id: &String) -> Result<Vec<DnsRecord>, reqwest::Error> {
