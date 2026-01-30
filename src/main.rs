@@ -1,13 +1,27 @@
 mod cloudflare;
 
-use cloudflare::{CloudflareClient,DnsRecord};
-use serde::Deserialize;
+use std::collections::HashSet;
 
+use cloudflare::{CloudflareClient,DnsRecord};
+use serde::{Deserialize, Deserializer};
+
+fn unicode_to_punycode<'de, D>(deserializer: D) -> Result<HashSet<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let domains: Vec<String> = Vec::deserialize(deserializer)?;
+    domains.into_iter()
+        .map(|domain| 
+            idna::domain_to_ascii(&domain)
+                .map_err(|err| serde::de::Error::custom(format!("Invalid domain {}: {}", domain, err)))
+        ).collect()
+}
 
 #[derive(Deserialize)]
 struct Zone {
     id: String,
-    domains: Vec<String>
+    #[serde(deserialize_with = "unicode_to_punycode")]
+    domains: HashSet<String>
 }
 
 #[derive(Deserialize)]
@@ -73,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         for record in dns_records {
             if record.kind != "A" { continue; }; 
-            if !zone.domains.iter().any(|s| *s == record.name) { continue };
+            if !zone.domains.contains(&record.name) { continue };
 
             let new_record = DnsRecord {
                 id: record.id,
@@ -83,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             cloudflare_client.update_dns_record(&zone.id, new_record).await?;
-            println!("Обновлено: {}", record.name);
+            println!("Обновлено: {}", idna::domain_to_unicode(&record.name).0);
         }
     }
 
